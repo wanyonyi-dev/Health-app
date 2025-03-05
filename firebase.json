@@ -1,0 +1,42 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "health-connect-bd597",
+          "appId": "1:422896380842:android:506a7117538fe0c41b59d3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "health-connect-bd597",
+          "configurations": {
+            "android": "1:422896380842:android:506a7117538fe0c41b59d3",
+            "ios": "1:422896380842:ios:c6d58c7eb1e5fa981b59d3",
+            "macos": "1:422896380842:ios:c6d58c7eb1e5fa981b59d3",
+            "web": "1:422896380842:web:ec6fc9f31e9138cd1b59d3",
+            "windows": "1:422896380842:web:b5978ab349fceea71b59d3"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}

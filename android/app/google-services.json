@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "422896380842",
+    "project_id": "health-connect-bd597",
+    "storage_bucket": "health-connect-bd597.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:422896380842:android:6941850aae3b40151b59d3",
+        "android_client_info": {
+          "package_name": "com.example.health_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0hNTEWKn8OjoyxOB_aY_4lpzf-Evef44"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:422896380842:android:e3418162ad2b5b641b59d3",
+        "android_client_info": {
+          "package_name": "com.example.health_connect_new"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0hNTEWKn8OjoyxOB_aY_4lpzf-Evef44"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:422896380842:android:506a7117538fe0c41b59d3",
+        "android_client_info": {
+          "package_name": "com.healthhub.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0hNTEWKn8OjoyxOB_aY_4lpzf-Evef44"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
