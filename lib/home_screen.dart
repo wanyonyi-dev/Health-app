@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:health_connect/screens/health_chat_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:health_connect/health_metrics_dashboard.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import './providers/appointment_cart_provider.dart';
 import './models/appointment.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.userId});
@@ -369,78 +371,161 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildUpcomingAppointments(BuildContext context) {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    debugPrint('Current userId: $userId'); // Debug log
-
     return SliverToBoxAdapter(
-      child: Consumer<AppointmentCartProvider>(
-        builder: (context, cartProvider, child) {
-          return StreamBuilder<List<Appointment>>(
-            stream: cartProvider.getUpcomingAppointments(userId),
-            builder: (context, AsyncSnapshot<List<Appointment>> snapshot) {
-              debugPrint('Stream state: ${snapshot.connectionState}'); // Debug log
-              debugPrint('Stream error: ${snapshot.error}'); // Debug log
-              debugPrint('Stream data: ${snapshot.data}'); // Debug log
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upcoming Appointments',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('appointments')
+                  .where('userId', isEqualTo: widget.userId)
+                  .where('dateTime', isGreaterThanOrEqualTo: DateTime.now())
+                  .orderBy('dateTime')
+                  .limit(5)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  );
+                }
 
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
 
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                final appointments = snapshot.data?.docs ?? [];
 
-              final appointments = snapshot.data ?? [];
-
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Upcoming Appointments',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                if (appointments.isEmpty) {
+                  return Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          'No upcoming appointments',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    if (appointments.isEmpty)
-                      const Center(
-                        child: Text('No upcoming appointments'),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: appointments.length,
-                        itemBuilder: (context, index) {
-                          final appointment = appointments[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              title: Text(appointment.patientName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Date: ${DateFormat('MMM dd, yyyy').format(appointment.dateTime)}'),
-                                  Text('Time: ${DateFormat('hh:mm a').format(appointment.dateTime)}'),
-                                  Text('Session: ${appointment.session}'),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: appointments.length,
+                  itemBuilder: (context, index) {
+                    final appointmentData = appointments[index].data() as Map<String, dynamic>;
+                    final dateTime = (appointmentData['dateTime'] as Timestamp).toDate();
+
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.calendar_today,
+                            color: Color(0xFF3B82F6),
+                          ),
+                        ),
+                        title: Text(
+                          appointmentData['patientName'] ?? 'N/A',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              'Date: ${DateFormat('MMM dd, yyyy').format(dateTime)}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Time: ${appointmentData['session'] ?? 'N/A'}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Service: ${appointmentData['serviceId'] ?? 'N/A'}',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(appointmentData['status']),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            appointmentData['status'] ?? 'Pending',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      case 'pending':
+        return const Color(0xFF3B82F6);
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildMainServices(BuildContext context) {
@@ -546,7 +631,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Navigator.pushNamed(context, '/schedule');
                 break;
               case 2:
-                Navigator.pushNamed(context, '/chat');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HealthChatScreen()),
+                );
                 break;
               case 3:
                 Navigator.pushNamed(context, '/settings');

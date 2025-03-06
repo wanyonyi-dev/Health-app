@@ -122,6 +122,7 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
   String? _selectedDoctor;
   String? _selectedSession;
   DateTime _selectedDate = DateTime.now();
+  bool _isLoading = false;
 
   // Sample services data - moved to a separate method
   List<Service> get services => _getServices();
@@ -582,28 +583,54 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Consumer<AppointmentCartProvider>(
-          builder: (context, provider, child) {
-            if (provider.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Consumer<AppointmentCartProvider>(
+            builder: (context, provider, child) {
+              if (provider.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.75,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(
+              return Column(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Appointment Cart',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    height: 4,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Your Appointments',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Appointment List
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
@@ -612,7 +639,7 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
+                          return _buildErrorState(snapshot.error.toString());
                         }
 
                         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -622,10 +649,11 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                         final appointments = snapshot.data?.docs ?? [];
 
                         if (appointments.isEmpty) {
-                          return const Center(child: Text('No appointments in cart'));
+                          return _buildEmptyState();
                         }
 
                         return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: appointments.length,
                           itemBuilder: (context, index) {
                             final data = appointments[index].data() as Map<String, dynamic>;
@@ -637,45 +665,339 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                     ),
                   ),
                 ],
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
   }
 
-// Helper method to build appointment card
   Widget _buildAppointmentCard(
-      BuildContext context,
-      Appointment appointment,
-      AppointmentCartProvider provider,
-      ) {
+    BuildContext context,
+    Appointment appointment,
+    AppointmentCartProvider provider,
+  ) {
     final service = services.firstWhere((s) => s.id == appointment.serviceId);
     final doctor = doctors.firstWhere((d) => d.id == appointment.doctorId);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        title: Text(service.name),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(doctor.name),
-            Text('Date: ${DateFormat('yyyy-MM-dd').format(appointment.dateTime)}'),
-            Text('Session: ${appointment.session}'),
-          ],
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete),
-          onPressed: () {
-            provider.removeAppointment(appointment.id);
-            _deleteAppointment(appointment.id);
-          },
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              title: Text(
+                service.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.person, size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(doctor.name),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(DateFormat('MMM dd, yyyy').format(appointment.dateTime)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(appointment.session),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.black12)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showRescheduleDialog(context, appointment),
+                    icon: const Icon(Icons.edit_calendar, color: Colors.blue),
+                    label: const Text('Reschedule', style: TextStyle(color: Colors.blue)),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 24,
+                    color: Colors.black12,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _confirmDelete(context, appointment.id),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    label: const Text('Cancel', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'No appointments yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Book your first appointment now',
+            style: TextStyle(color: Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRescheduleDialog(BuildContext context, Appointment appointment) {
+    DateTime selectedDate = DateTime.now();
+    String? selectedSession;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+          ),
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    const Text(
+                      'Reschedule Appointment',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Scrollable content
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Current appointment info
+                            Card(
+                              child: ListTile(
+                                title: const Text('Current Appointment'),
+                                subtitle: Text(
+                                  'Date: ${DateFormat('MMM dd, yyyy').format(appointment.dateTime)}\n'
+                                  'Session: ${appointment.session}',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            
+                            // New date selection
+                            const Text(
+                              'Select New Date:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(
+                              height: 300,
+                              child: CalendarDatePicker(
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 90)),
+                                onDateChanged: (date) {
+                                  setState(() => selectedDate = date);
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            
+                            // Session selection
+                            const Text(
+                              'Select New Session:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('appointments')
+                                  .where('dateTime', isEqualTo: Timestamp.fromDate(selectedDate))
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  return const Text('Error loading sessions');
+                                }
+
+                                final sessions = {
+                                  'Morning (8:00 AM - 1:00 PM)': 0,
+                                  'Afternoon (2:00 PM - 4:00 PM)': 0,
+                                };
+
+                                if (snapshot.hasData) {
+                                  for (var doc in snapshot.data!.docs) {
+                                    final data = doc.data() as Map<String, dynamic>;
+                                    String session = data['session'] as String;
+                                    sessions[session] = (sessions[session] ?? 0) + 1;
+                                  }
+                                }
+
+                                return Column(
+                                  children: sessions.entries.map((entry) {
+                                    return RadioListTile<String>(
+                                      title: Text(entry.key),
+                                      value: entry.key,
+                                      groupValue: selectedSession,
+                                      onChanged: (value) {
+                                        setState(() => selectedSession = value);
+                                      },
+                                    );
+                                  }).toList(),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Action buttons
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: selectedSession == null ? null : () async {
+                            await _rescheduleAppointment(
+                              appointment.id,
+                              selectedDate,
+                              selectedSession!,
+                            );
+                            if (context.mounted) Navigator.pop(context);
+                          },
+                          child: const Text('Confirm'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _rescheduleAppointment(
+    String appointmentId,
+    DateTime newDate,
+    String newSession,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .doc(appointmentId)
+          .update({
+        'dateTime': Timestamp.fromDate(newDate),
+        'session': newSession,
+        'lastUpdated': Timestamp.fromDate(DateTime.now()),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Appointment rescheduled successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error rescheduling appointment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, String appointmentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Appointment'),
+        content: const Text('Are you sure you want to cancel this appointment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAppointment(appointmentId);
+    }
+  }
+
   void _setReminder(Appointment appointment) async {
     // Implement reminder functionality here
     // This could use local notifications or any other reminder system
@@ -690,12 +1012,15 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
 
   Future<void> _deleteAppointment(String appointmentId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('appointments')
-          .doc(appointmentId)
-          .delete();
+      // Show loading indicator
+      setState(() => _isLoading = true);
+      
+      // Delete appointment using provider
+      await widget.cartProvider.removeAppointment(appointmentId);
 
       if (!mounted) return;
+      
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Appointment cancelled successfully'),
@@ -703,16 +1028,66 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+
+      // Close bottom sheet
+      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error cancelling appointment: $e'),
+          content: Text('Failed to cancel appointment: ${e.toString()}'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+          const SizedBox(height: 16),
+          Text(
+            'Oops! Something went wrong',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error,
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

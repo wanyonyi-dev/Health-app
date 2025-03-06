@@ -67,19 +67,16 @@ class AppointmentCartProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> removeAppointment(String id) async {
+  Future<void> removeAppointment(String appointmentId) async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      // First delete from Firestore
+      await _firestore.collection('appointments').doc(appointmentId).delete();
       
-      await _firestore.collection('appointments').doc(id).delete();
-      
-      _isLoading = false;
+      // Then update local state
+      _appointments.removeWhere((appointment) => appointment.id == appointmentId);
       notifyListeners();
     } catch (e) {
-      _isLoading = false;
       _error = e.toString();
-      notifyListeners();
       debugPrint('Error removing appointment from Firestore: $e');
       rethrow;
     }
@@ -106,4 +103,4 @@ class AppointmentCartProvider extends ChangeNotifier {
     _appointmentSubscription?.cancel();
     super.dispose();
   }
-} 
+}

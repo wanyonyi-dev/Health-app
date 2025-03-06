@@ -97,7 +97,9 @@ class MyApp extends StatelessWidget {
           cartProvider: Provider.of<AppointmentCartProvider>(context),
         ),
         '/emergencyContacts': (context) => emergency.EmergencyContactsScreen(),
-        '/calendar': (context) => const CalendarScreen(),
+        '/calendar': (context) => CalendarScreen(
+          cartProvider: Provider.of<AppointmentCartProvider>(context),
+        ),
         '/legalSupport': (context) => const LegalSupportScreen(),
         '/adminDashboard': (context) => const AdminDashboard(),
         '/doctorDashboard': (context) => DoctorDashboard(),

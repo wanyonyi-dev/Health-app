@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:health_connect/widgets/add_metric_dialog.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -201,6 +202,11 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
           },
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showMetricSelectionDialog(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Metric'),
+      ),
     );
   }
 
@@ -285,6 +291,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'bpm',
         trend: _getMetricTrend('heart_rate', '0'),
         color: const Color(0xFFEF4444),
+        metricType: 'heart_rate',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.footprints,
@@ -293,6 +301,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'steps',
         trend: _getMetricTrend('steps', '0'),
         color: const Color(0xFF3B82F6),
+        metricType: 'steps',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.bed,
@@ -301,6 +311,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'hours',
         trend: _getMetricTrend('sleep', '0'),
         color: const Color(0xFF8B5CF6),
+        metricType: 'sleep',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.flame,
@@ -309,6 +321,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'kcal',
         trend: _getMetricTrend('calories', '0'),
         color: const Color(0xFFF59E0B),
+        metricType: 'calories',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.scale,
@@ -317,6 +331,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'kg',
         trend: _getMetricTrend('weight', '0'),
         color: const Color(0xFF14B8A6),
+        metricType: 'weight',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.activity,
@@ -325,6 +341,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'mmHg',
         trend: _getMetricTrend('blood_pressure', '0'),
         color: const Color(0xFFEC4899),
+        metricType: 'blood_pressure',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.droplets,
@@ -333,6 +351,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'mg/dL',
         trend: _getMetricTrend('blood_sugar', '0'),
         color: const Color(0xFF6366F1),
+        metricType: 'blood_sugar',
+        userId: widget.userId,
       ),
       MetricCard(
         icon: LucideIcons.dumbbell,
@@ -341,6 +361,8 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         unit: 'min',
         trend: _getMetricTrend('active_minutes', '0'),
         color: const Color(0xFF84CC16),
+        metricType: 'active_minutes',
+        userId: widget.userId,
       ),
     ];
 
@@ -689,6 +711,59 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
       ],
     );
   }
+
+  void _showMetricSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Metric'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: metrics.map((metric) {
+              return ListTile(
+                leading: Icon(getMetricIcon(metric)),
+                title: Text(metric),
+                onTap: () {
+                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    builder: (context) => AddMetricDialog(
+                      userId: widget.userId,
+                      metricType: getMetricType(metric),
+                      unit: getMetricUnit(metric),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData getMetricIcon(String metric) {
+    switch (metric) {
+      case 'Heart Rate': return LucideIcons.heart;
+      case 'Steps': return LucideIcons.footprints;
+      // ... add other cases
+      default: return LucideIcons.activity;
+    }
+  }
+
+  String getMetricType(String metric) {
+    return metric.toLowerCase().replaceAll(' ', '_');
+  }
+
+  String getMetricUnit(String metric) {
+    switch (metric) {
+      case 'Heart Rate': return 'bpm';
+      case 'Steps': return 'steps';
+      // ... add other cases
+      default: return '';
+    }
+  }
 }
 
 class MetricCard extends StatelessWidget {
@@ -698,6 +773,8 @@ class MetricCard extends StatelessWidget {
   final String unit;
   final String trend;
   final Color color;
+  final String metricType; // Add this
+  final String userId; // Add this
 
   const MetricCard({
     super.key,
@@ -707,96 +784,113 @@ class MetricCard extends StatelessWidget {
     required this.unit,
     required this.trend,
     required this.color,
+    required this.metricType, // Add this
+    required this.userId, // Add this
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const Spacer(),
-                if (trend != '0')
+    return InkWell(
+      onTap: () => _showAddMetricDialog(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: trend.startsWith('+')
-                          ? Colors.green.withOpacity(0.1)
-                          : Colors.red.withOpacity(0.1),
+                      color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      trend,
-                      style: TextStyle(
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const Spacer(),
+                  if (trend != '0')
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
                         color: trend.startsWith('+')
-                            ? Colors.green[700]
-                            : Colors.red[700],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        trend,
+                        style: TextStyle(
+                          color: trend.startsWith('+')
+                              ? Colors.green[700]
+                              : Colors.red[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+              const Spacer(),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  unit,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                  const SizedBox(width: 4),
+                  Text(
+                    unit,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _showAddMetricDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AddMetricDialog(
+        userId: userId,
+        metricType: metricType,
+        unit: unit,
       ),
     );
   }
