@@ -139,39 +139,80 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       setState(() => _isLoading = true);
+      
       try {
-        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-          email: _email,
-          password: _password,
-        );
-
-        // Check if the user is a doctor
+        // Check if attempting doctor login
         if (_email == _doctorEmail && _password == _doctorPassword) {
-          // Verify doctor exists in Firestore
-          DocumentSnapshot doctorDoc = await _firestore
-              .collection('doctors')
-              .doc(userCredential.user!.uid)
-              .get();
+          try {
+            UserCredential? userCredential = await _auth.signInWithEmailAndPassword(
+              email: _email,
+              password: _password,
+            );
 
-          if (doctorDoc.exists) {
-            Navigator.of(context).pushReplacementNamed('/doctor_dashboard');
-          } else {
-            // Create doctor document if it doesn't exist
-            await _firestore.collection('doctors').doc(userCredential.user!.uid).set({
-              'email': _email,
-              'userType': 'doctor',
-              'createdAt': FieldValue.serverTimestamp(),
-            });
-            Navigator.of(context).pushReplacementNamed('/doctor_dashboard');
+            // Check/create doctor document in Firestore
+            DocumentSnapshot doctorDoc = await _firestore
+                .collection('doctors')
+                .doc(userCredential.user!.uid)
+                .get();
+
+            if (!doctorDoc.exists) {
+              // Create doctor profile if first time login
+              await _firestore.collection('doctors').doc(userCredential.user!.uid).set({
+                'email': _email,
+                'userType': 'doctor',
+                'createdAt': FieldValue.serverTimestamp(),
+                'isActive': true,
+                'specialization': 'General Medicine',
+                'name': 'Doctor',
+                'lastLogin': FieldValue.serverTimestamp(),
+              });
+            }
+
+            if (!mounted) return;
+            
+            // Show success message
+            _showSuccessMessage('Welcome back, Doctor!');
+            
+            // Use pushReplacementNamed for navigation
+            Navigator.of(context).pushReplacementNamed('/doctorDashboard');
+            return;
+          } catch (e) {
+            print('Doctor login error: $e'); // For debugging
+            _showErrorMessage('Error signing in as doctor. Please try again.');
+            setState(() => _isLoading = false);
+            return;
           }
-        } else {
-          // Handle patient login
-          await _handlePatientLogin();
         }
+
+        // Handle regular patient login if not a doctor
+        await _handlePatientLogin();
+
+      } on FirebaseAuthException catch (e) {
+        String errorMessage;
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'No account found with this email.';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Invalid password.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address.';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Network error. Please check your connection.';
+            break;
+          default:
+            errorMessage = 'Authentication failed: ${e.message}';
+        }
+        _showErrorMessage(errorMessage);
       } catch (e) {
-        _showErrorMessage(e.toString());
+        print('Login error: $e'); // Add this for debugging
+        _showErrorMessage('An unexpected error occurred. Please try again.');
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }

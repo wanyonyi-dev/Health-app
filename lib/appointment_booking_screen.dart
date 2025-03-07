@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import './models/appointment.dart';
 import './providers/appointment_cart_provider.dart';
+import './utils/session_utils.dart';
+import 'package:intl/intl.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -429,16 +432,34 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+            
+            // Calendar widget
+            Card(
+              child: CalendarDatePicker(
+                initialDate: _selectedDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 90)),
+                onDateChanged: (date) {
+                  setState(() {
+                    _selectedDate = date;
+                    _selectedSession = null; // Reset session when date changes
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Session selection
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('appointments')
                   .where('serviceId', isEqualTo: _selectedService)
                   .where('dateTime',
-                  isGreaterThanOrEqualTo: DateTime(
-                      _selectedDate.year, _selectedDate.month, _selectedDate.day))
+                      isGreaterThanOrEqualTo: DateTime(
+                          _selectedDate.year, _selectedDate.month, _selectedDate.day))
                   .where('dateTime',
-                  isLessThan: DateTime(
-                      _selectedDate.year, _selectedDate.month, _selectedDate.day + 1))
+                      isLessThan: DateTime(
+                          _selectedDate.year, _selectedDate.month, _selectedDate.day + 1))
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -463,18 +484,25 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                 }
 
                 final Service service =
-                services.firstWhere((s) => s.id == _selectedService);
+                    services.firstWhere((s) => s.id == _selectedService);
 
                 return Column(
                   children: sessionCounts.entries.map((entry) {
-                    int availableSlots =
-                        service.maxSlotsPerSession - entry.value;
-                    bool isAvailable = availableSlots > 0;
+                    int availableSlots = service.maxSlotsPerSession - entry.value;
+                    bool isSessionAvailable = SessionUtils.isSessionAvailable(
+                      entry.key, 
+                      _selectedDate
+                    );
+                    bool isAvailable = availableSlots > 0 && isSessionAvailable;
+
+                    String subtitle = isSessionAvailable 
+                        ? 'Available slots: $availableSlots'
+                        : 'Session expired';
 
                     return RadioListTile<String>(
                       title: Text(entry.key),
                       subtitle: Text(
-                        'Available slots: $availableSlots',
+                        subtitle,
                         style: TextStyle(
                           color: isAvailable ? Colors.green : Colors.red,
                         ),
@@ -483,10 +511,10 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                       groupValue: _selectedSession,
                       onChanged: isAvailable
                           ? (String? value) {
-                        setState(() {
-                          _selectedSession = value;
-                        });
-                      }
+                              setState(() {
+                                _selectedSession = value;
+                              });
+                            }
                           : null,
                       activeColor: Colors.blue,
                       tileColor: isAvailable ? null : Colors.grey.shade200,
@@ -525,46 +553,112 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
 
   Future<void> _bookAppointment() async {
     if (!_formKey.currentState!.validate()) return;
-
-    try {
-      final String appointmentId = DateTime.now().millisecondsSinceEpoch.toString();
-      
-      // Create appointment object
-      final appointment = Appointment(
-        id: appointmentId,
-        patientName: _nameController.text,
-        phoneNumber: _phoneController.text,
-        age: int.parse(_ageController.text),
-        county: _countyController.text,
-        idNumber: _idNumberController.text,
-        serviceId: _selectedService!,
-        doctorId: _selectedDoctor!,
-        dateTime: _selectedDate,
-        session: _selectedSession!,
+    
+    // Validate session availability
+    if (_selectedSession == null || !SessionUtils.isSessionAvailable(_selectedSession!, _selectedDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selected session has expired or is invalid'),
+          backgroundColor: Colors.red,
+        ),
       );
-
-      // Add to cart provider
-      await widget.cartProvider.addAppointment(appointment);
-
+      return;
+    }
+  
+    setState(() => _isLoading = true);
+  
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+  
+      // Create the appointment document
+      final appointment = {
+        'patientId': user.uid,
+        'patientName': _nameController.text,
+        'phoneNumber': _phoneController.text,
+        'age': int.parse(_ageController.text),
+        'county': _countyController.text,
+        'idNumber': _idNumberController.text,
+        'serviceId': _selectedService,
+        'doctorId': _selectedDoctor,
+        'session': _selectedSession,
+        'dateTime': Timestamp.fromDate(_selectedDate),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+  
+      // First check if slot is still available
+      final existingAppointments = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('serviceId', isEqualTo: _selectedService)
+          .where('session', isEqualTo: _selectedSession)
+          .where('dateTime', isEqualTo: Timestamp.fromDate(_selectedDate))
+          .where('status', whereIn: ['pending', 'confirmed'])
+          .get();
+  
+      final service = services.firstWhere((s) => s.id == _selectedService);
+      if (existingAppointments.docs.length >= service.maxSlotsPerSession) {
+        throw Exception('Session is full. Please select another session.');
+      }
+  
+      // Create the appointment
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .add(appointment);
+  
+      // Add to user's appointments subcollection for easy access
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('appointments')
+          .add(appointment);
+  
       if (!mounted) return;
+      
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Appointment booked successfully'),
           backgroundColor: Colors.green,
         ),
       );
-
+  
+      // Clear form
       _clearForm();
+  
     } catch (e) {
       if (!mounted) return;
+      
+      String errorMessage = 'Failed to book appointment';
+      if (e is FirebaseException) {
+        switch (e.code) {
+          case 'permission-denied':
+            errorMessage = 'You don\'t have permission to book appointments';
+            break;
+          case 'resource-exhausted':
+            errorMessage = 'Session is full. Please select another session';
+            break;
+          default:
+            errorMessage = e.message ?? 'Unknown error occurred';
+        }
+      } else {
+        errorMessage = e.toString();
+      }
+  
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error booking appointment: $e'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
   void _clearForm() {
     _nameController.clear();
     _phoneController.clear();
@@ -656,8 +750,13 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: appointments.length,
                           itemBuilder: (context, index) {
-                            final data = appointments[index].data() as Map<String, dynamic>;
-                            final appointment = Appointment.fromMap(data);
+                            final doc = appointments[index];
+                            final data = doc.data() as Map<String, dynamic>;
+                            // Include the document ID when creating the appointment
+                            final appointment = Appointment.fromMap(
+                              data,
+                              id: doc.id, // Pass the document ID here
+                            );
                             return _buildAppointmentCard(context, appointment, provider);
                           },
                         );
@@ -678,8 +777,24 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
     Appointment appointment,
     AppointmentCartProvider provider,
   ) {
-    final service = services.firstWhere((s) => s.id == appointment.serviceId);
-    final doctor = doctors.firstWhere((d) => d.id == appointment.doctorId);
+    final service = services.firstWhere(
+      (s) => s.id == appointment.serviceId,
+      orElse: () => Service(
+        id: '',
+        name: 'Unknown Service',
+        maxSlotsPerSession: 0,
+        doctorIds: [],
+      ),
+    );
+    
+    final doctor = doctors.firstWhere(
+      (d) => d.id == appointment.doctorId,
+      orElse: () => Doctor(
+        id: '',
+        name: 'Unknown Doctor',
+        specialization: '',
+      ),
+    );
 
     return Card(
       elevation: 2,
@@ -744,17 +859,17 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   TextButton.icon(
-                    onPressed: () => _showRescheduleDialog(context, appointment),
+                    onPressed: appointment.id != null 
+                        ? () => _showRescheduleDialog(context, appointment)
+                        : null,
                     icon: const Icon(Icons.edit_calendar, color: Colors.blue),
                     label: const Text('Reschedule', style: TextStyle(color: Colors.blue)),
                   ),
-                  Container(
-                    width: 1,
-                    height: 24,
-                    color: Colors.black12,
-                  ),
+                  Container(width: 1, height: 24, color: Colors.black12),
                   TextButton.icon(
-                    onPressed: () => _confirmDelete(context, appointment.id),
+                    onPressed: appointment.id != null 
+                        ? () => _confirmDelete(context, appointment.id)
+                        : null,
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     label: const Text('Cancel', style: TextStyle(color: Colors.red)),
                   ),
@@ -919,12 +1034,22 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: selectedSession == null ? null : () async {
-                            await _rescheduleAppointment(
-                              appointment.id,
-                              selectedDate,
-                              selectedSession!,
-                            );
-                            if (context.mounted) Navigator.pop(context);
+                            if (appointment.id != null) {
+                              await _rescheduleAppointment(
+                                appointment.id,
+                                selectedDate,
+                                selectedSession!,
+                              );
+                              if (context.mounted) Navigator.pop(context);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cannot reschedule: Invalid appointment ID'),
+                                  backgroundColor: Colors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           },
                           child: const Text('Confirm'),
                         ),
@@ -941,39 +1066,67 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
   }
 
   Future<void> _rescheduleAppointment(
-    String appointmentId,
+    String? appointmentId,
     DateTime newDate,
     String newSession,
   ) async {
+    if (appointmentId == null || appointmentId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid appointment ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+  
     try {
       await FirebaseFirestore.instance
           .collection('appointments')
           .doc(appointmentId)
           .update({
-        'dateTime': Timestamp.fromDate(newDate),
-        'session': newSession,
-        'lastUpdated': Timestamp.fromDate(DateTime.now()),
-      });
-
+            'dateTime': Timestamp.fromDate(newDate),
+            'session': newSession,
+            'status': 'rescheduled',
+            'updatedAt': FieldValue.serverTimestamp(),
+            'lastRescheduled': FieldValue.serverTimestamp(),
+            'rescheduledBy': FirebaseAuth.instance.currentUser?.uid,
+          });
+  
       if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Appointment rescheduled successfully'),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+      
+      String errorMessage = _getErrorMessage(e);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error rescheduling appointment: $e'),
+          content: Text('Error rescheduling appointment: $errorMessage'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-  Future<void> _confirmDelete(BuildContext context, String appointmentId) async {
+  Future<void> _confirmDelete(BuildContext context, String? appointmentId) async {
+    if (appointmentId == null || appointmentId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid appointment ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+  
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -986,16 +1139,78 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Yes'),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Yes'),
           ),
         ],
       ),
     );
-
+  
+    // We can safely use '!' here because we've checked for null above
     if (confirmed == true) {
       await _deleteAppointment(appointmentId);
     }
+  }
+  
+  // Update the _deleteAppointment method signature to be explicit about non-null requirement
+  Future<void> _deleteAppointment(String appointmentId) async {
+    try {
+      setState(() => _isLoading = true);
+      
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .doc(appointmentId)
+          .update({
+            'status': 'cancelled',
+            'updatedAt': FieldValue.serverTimestamp(),
+            'cancelledAt': FieldValue.serverTimestamp(),
+            'cancelledBy': FirebaseAuth.instance.currentUser?.uid,
+          });
+  
+      await widget.cartProvider.removeAppointment(appointmentId);
+  
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Appointment cancelled successfully'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      
+      String errorMessage = _getErrorMessage(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  // Helper method to get error messages
+  String _getErrorMessage(dynamic error) {
+    if (error is FirebaseException) {
+      switch (error.code) {
+        case 'not-found':
+          return 'Appointment not found';
+        case 'permission-denied':
+          return 'You don\'t have permission to cancel this appointment';
+        default:
+          return 'Error: ${error.message}';
+      }
+    }
+    return 'Failed to cancel appointment';
   }
 
   void _setReminder(Appointment appointment) async {
@@ -1008,43 +1223,6 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  Future<void> _deleteAppointment(String appointmentId) async {
-    try {
-      // Show loading indicator
-      setState(() => _isLoading = true);
-      
-      // Delete appointment using provider
-      await widget.cartProvider.removeAppointment(appointmentId);
-
-      if (!mounted) return;
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Appointment cancelled successfully'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // Close bottom sheet
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to cancel appointment: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
   }
 
   Widget _buildErrorState(String error) {

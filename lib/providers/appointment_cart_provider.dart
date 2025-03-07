@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../models/appointment.dart';
 
 class AppointmentCartProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   List<Appointment> _appointments = [];
   StreamSubscription<QuerySnapshot>? _appointmentSubscription;
   bool _isLoading = false;
@@ -19,15 +21,18 @@ class AppointmentCartProvider extends ChangeNotifier {
   }
 
   void _initializeAppointmentListener() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
     _appointmentSubscription = _firestore
         .collection('appointments')
+        .where('patientId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snapshot) {
-      _appointments = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Appointment.fromMap(data);
-      }).toList();
+      _appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
       notifyListeners();
     });
   }
@@ -36,49 +41,89 @@ class AppointmentCartProvider extends ChangeNotifier {
     final now = DateTime.now();
     return _firestore
         .collection('appointments')
-        .where('userId', isEqualTo: userId)
+        .where('patientId', isEqualTo: userId)
         .where('dateTime', isGreaterThanOrEqualTo: now)
         .orderBy('dateTime')
         .limit(5)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Appointment.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) => Appointment.fromFirestore(doc))
             .toList());
   }
 
   Future<void> addAppointment(Appointment appointment) async {
     try {
       _isLoading = true;
+      _error = null;
       notifyListeners();
+
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
       
-      await _firestore.collection('appointments').doc(appointment.id).set({
+      final docRef = await _firestore.collection('appointments').add({
+        'patientId': userId,
         ...appointment.toMap(),
-        'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // Update local state with the new appointment including its ID
+      final newAppointment = Appointment.fromFirestore(
+        await docRef.get().then((doc) => doc as DocumentSnapshot<Map<String, dynamic>>)
+      );
+      _appointments.add(await newAppointment);
       
-      _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _isLoading = false;
       _error = e.toString();
-      notifyListeners();
-      debugPrint('Error adding appointment to Firestore: $e');
       rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> removeAppointment(String appointmentId) async {
-    try {
-      // First delete from Firestore
-      await _firestore.collection('appointments').doc(appointmentId).delete();
-      
-      // Then update local state
-      _appointments.removeWhere((appointment) => appointment.id == appointmentId);
+  Future<bool> removeAppointment(String appointmentId) async {
+    if (appointmentId.isEmpty) {
+      _error = 'Invalid appointment ID';
       notifyListeners();
+      return false;
+    }
+
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final docRef = _firestore.collection('appointments').doc(appointmentId);
+      final doc = await docRef.get();
+      
+      if (!doc.exists) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'not-found',
+          message: 'Appointment not found',
+        );
+      }
+
+      await docRef.update({
+        'status': 'cancelled',
+        'updatedAt': FieldValue.serverTimestamp(),
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'cancelledBy': _auth.currentUser?.uid ?? 'unknown',
+      });
+
+      // Update local state
+      _appointments.removeWhere((app) => app.id == appointmentId);
+      
+      notifyListeners();
+      return true;
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error removing appointment from Firestore: $e');
-      rethrow;
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -95,6 +140,30 @@ class AppointmentCartProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error clearing cart in Firestore: $e');
       rethrow;
+    }
+  }
+
+  Future<List<Appointment>> fetchAppointments() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final snapshot = await _firestore
+          .collection('appointments')
+          .where('patientId', isEqualTo: userId)
+          .get();
+
+      _appointments = snapshot.docs
+          .map((doc) => Appointment.fromFirestore(doc))
+          .toList();
+      
+      notifyListeners();
+      return _appointments;
+    } catch (e) {
+      _error = e.toString();
+      return [];
     }
   }
 
