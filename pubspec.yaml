@@ -24,7 +24,6 @@ dependencies:
   flutter_chat_ui: ^1.6.15
   flutter_chat_types: ^3.6.2
   permission_handler: ^11.3.1
-  audioplayers: ^6.1.0
   firebase_core_web: ^2.18.1
   flutter_svg: ^2.0.13
   cached_network_image: ^3.4.1

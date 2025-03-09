@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller.forward();
 
     // Navigate after delay
-    Timer(const Duration(seconds: 3), () {
+    Timer(const Duration(seconds: 8), () {
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
@@ -74,21 +74,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFF4158D0),
-              const Color(0xFF4158D0).withOpacity(0.8),
-              const Color(0xFFC850C0).withOpacity(0.9),
-              const Color(0xFFFFCC70),
-            ],
+      // Remove any default padding
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      // Set background color to avoid any white flashes
+      backgroundColor: const Color(0xFF4158D0),
+      body: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        removeBottom: true,
+        child: Container(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF4158D0),
+                const Color(0xFF4158D0).withOpacity(0.8),
+                const Color(0xFFC850C0).withOpacity(0.9),
+                const Color(0xFFFFCC70),
+              ],
+            ),
           ),
-        ),
-        child: SafeArea(
           child: Stack(
+            fit: StackFit.expand,
             children: [
               // Animated background patterns
               Positioned.fill(
@@ -96,143 +107,145 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   opacity: _fadeAnimation,
                   child: CustomPaint(
                     painter: BackgroundPatternPainter(),
+                    size: Size.infinite,
                   ),
                 ),
               ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Logo with enhanced animations
-                        ScaleTransition(
-                          scale: _scaleAnimation,
-                          child: Container(
-                            padding: const EdgeInsets.all(25),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(40),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
+              // Main content
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Spacer(flex: 2),
+                    // Logo with enhanced animations
+                    ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: Container(
+                        padding: const EdgeInsets.all(25),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(40),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            height: 120,
+                            width: 120,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 50),
+                    // Animated text with slide effect
+                    AnimatedBuilder(
+                      animation: _slideAnimation,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(0, _slideAnimation.value),
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'We Care',
+                                  style: TextStyle(
+                                    fontSize: 48,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(2, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(30),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Your Healthcare Companion',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.white.withOpacity(0.95),
+                                      letterSpacing: 0.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                height: 120,
-                                width: 120,
-                              ),
-                            ),
                           ),
-                        ),
-                        const SizedBox(height: 50),
-                        // Animated text with slide effect
-                        AnimatedBuilder(
-                          animation: _slideAnimation,
-                          builder: (context, child) {
-                            return Transform.translate(
-                              offset: Offset(0, _slideAnimation.value),
-                              child: FadeTransition(
-                                opacity: _fadeAnimation,
-                                child: Column(
-                                  children: [
-                                    const Text(
-                                      'We Care',
-                                      style: TextStyle(
-                                        fontSize: 48,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        letterSpacing: 2,
-                                        shadows: [
-                                          Shadow(
-                                            color: Colors.black26,
-                                            offset: Offset(2, 2),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(30),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.2),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Your Healthcare Companion',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          color: Colors.white.withOpacity(0.95),
-                                          letterSpacing: 0.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                  // Modern loading indicator
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 60),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            width: 180,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: LinearProgressIndicator(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white.withOpacity(0.8),
+                    const Spacer(flex: 2),
+                    // Modern loading indicator
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).size.height * 0.08,
+                      ),
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              width: 180,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  backgroundColor: Colors.white.withOpacity(0.2),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white.withOpacity(0.8),
+                                  ),
+                                  minHeight: 8,
                                 ),
-                                minHeight: 8,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading...',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 16,
-                              letterSpacing: 1,
+                            const SizedBox(height: 16),
+                            Text(
+                              'Loading...',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 16,
+                                letterSpacing: 1,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -250,11 +263,11 @@ class BackgroundPatternPainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.05)
       ..style = PaintingStyle.fill;
 
-    // Draw subtle geometric patterns
+    // Draw subtle geometric patterns that scale with screen size
     for (var i = 0; i < 5; i++) {
       canvas.drawCircle(
         Offset(size.width * (0.2 * i), size.height * 0.3),
-        40 + (i * 20),
+        size.width * 0.05 + (i * size.width * 0.02),
         paint,
       );
     }
@@ -269,6 +282,23 @@ class BackgroundPatternPainter extends CustomPainter {
       size.height * 0.3,
     );
     canvas.drawPath(path, paint);
+
+    // Add more responsive patterns
+    final bottomPath = Path();
+    bottomPath.moveTo(0, size.height * 0.7);
+    bottomPath.quadraticBezierTo(
+      size.width * 0.3,
+      size.height * 0.8,
+      size.width * 0.6,
+      size.height * 0.75,
+    );
+    bottomPath.quadraticBezierTo(
+      size.width * 0.9,
+      size.height * 0.7,
+      size.width,
+      size.height * 0.8,
+    );
+    canvas.drawPath(bottomPath, paint);
   }
 
   @override

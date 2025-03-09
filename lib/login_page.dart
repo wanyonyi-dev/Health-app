@@ -2,36 +2,67 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:email_validator/email_validator.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({Key? key}) : super(key: key);
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _resetFormKey = GlobalKey<FormState>();
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
-  final _resetFormKey = GlobalKey<FormState>();
+
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   String _email = '';
   String _password = '';
   String _confirmPassword = '';
   String _mobileNumber = '';
-  bool _isDoctor = false;
   bool _isCreatingAccount = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
-  final primaryColor = Color(0xFF6C63FF);
-  final secondaryColor = Color(0xFF2A2A72);
-  final backgroundColor = Color(0xFFF5F6F9);
-  final cardColor = Colors.white;
-  final errorColor = Color(0xFFFF6B6B);
-  final successColor = Color(0xFF28A745);
-
+  // Doctor credentials
   final String _doctorEmail = 'doctor@gmail.com';
   final String _doctorPassword = '823Abt254@';
+
+  // Theme colors
+  final primaryColor = const Color(0xFF4F6CFF);
+  final secondaryColor = const Color(0xFF2A2A72);
+  final backgroundColor = const Color(0xFFF9FAFC);
+  final cardColor = Colors.white;
+  final errorColor = const Color(0xFFFF6B6B);
+  final successColor = const Color(0xFF28A745);
+  final textColor = const Color(0xFF2D3748);
+  final subtitleColor = const Color(0xFF718096);
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeIn,
+      ),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   void _togglePasswordVisibility() {
     setState(() => _isPasswordVisible = !_isPasswordVisible);
@@ -46,22 +77,31 @@ class _LoginScreenState extends State<LoginScreen> {
       filled: true,
       fillColor: cardColor,
       hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey[400]),
-      prefixIcon: Icon(icon, color: primaryColor),
+      hintStyle: TextStyle(color: subtitleColor.withOpacity(0.7)),
+      prefixIcon: Icon(icon, color: primaryColor, size: 22),
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: primaryColor, width: 2),
       ),
-      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: errorColor, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: errorColor, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      errorStyle: TextStyle(color: errorColor),
     );
   }
 
@@ -72,17 +112,25 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('Reset Password'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Reset Password',
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Form(
           key: _resetFormKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Enter your email address and we\'ll send you a link to reset your password.',
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(color: subtitleColor, fontSize: 14),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 20),
               TextFormField(
                 decoration: _getInputDecoration(
                   hint: 'Enter your email',
@@ -102,8 +150,10 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-            style: TextButton.styleFrom(foregroundColor: Colors.grey),
+            child: Text('Cancel', style: TextStyle(color: subtitleColor)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -112,10 +162,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.pop(context, resetEmail);
               }
             },
-            child: Text('Reset Password'),
+            child: const Text('Reset Password'),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -139,12 +193,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       setState(() => _isLoading = true);
-      
+
       try {
+        if (_isCreatingAccount) {
+          await _handlePatientAuth();
+          return;
+        }
+
         // Check if attempting doctor login
         if (_email == _doctorEmail && _password == _doctorPassword) {
           try {
-            UserCredential? userCredential = await _auth.signInWithEmailAndPassword(
+            UserCredential userCredential = await _auth.signInWithEmailAndPassword(
               email: _email,
               password: _password,
             );
@@ -166,18 +225,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 'name': 'Doctor',
                 'lastLogin': FieldValue.serverTimestamp(),
               });
+            } else {
+              // Update last login time
+              await _firestore.collection('doctors').doc(userCredential.user!.uid).update({
+                'lastLogin': FieldValue.serverTimestamp(),
+              });
             }
 
             if (!mounted) return;
-            
-            // Show success message
+
             _showSuccessMessage('Welcome back, Doctor!');
-            
-            // Use pushReplacementNamed for navigation
             Navigator.of(context).pushReplacementNamed('/doctorDashboard');
             return;
           } catch (e) {
-            print('Doctor login error: $e'); // For debugging
             _showErrorMessage('Error signing in as doctor. Please try again.');
             setState(() => _isLoading = false);
             return;
@@ -199,6 +259,9 @@ class _LoginScreenState extends State<LoginScreen> {
           case 'invalid-email':
             errorMessage = 'Invalid email address.';
             break;
+          case 'email-already-in-use':
+            errorMessage = 'This email is already in use.';
+            break;
           case 'network-request-failed':
             errorMessage = 'Network error. Please check your connection.';
             break;
@@ -207,7 +270,6 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         _showErrorMessage(errorMessage);
       } catch (e) {
-        print('Login error: $e'); // Add this for debugging
         _showErrorMessage('An unexpected error occurred. Please try again.');
       } finally {
         if (mounted) {
@@ -232,47 +294,84 @@ class _LoginScreenState extends State<LoginScreen> {
       throw Exception('Patient account not found');
     }
 
+    // Update last login time
+    await _firestore.collection('patients').doc(userCredential.user!.uid).update({
+      'lastLogin': FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+
+    _showSuccessMessage('Login successful!');
     Navigator.of(context).pushReplacementNamed('/home');
   }
 
   Future<void> _handlePatientAuth() async {
-    UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-      email: _email,
-      password: _password,
-    );
+    // Check if email already exists
+    try {
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _email,
+        password: _password,
+      );
 
-    await _firestore.collection('patients').doc(userCredential.user!.uid).set({
-      'email': _email,
-      'userType': 'patient',
-      'mobileNumber': _mobileNumber,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+      await _firestore.collection('patients').doc(userCredential.user!.uid).set({
+        'email': _email,
+        'userType': 'patient',
+        'mobileNumber': _mobileNumber,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
 
-    Navigator.of(context).pushReplacementNamed('/home');
+      if (!mounted) return;
+
+      _showSuccessMessage('Account created successfully!');
+      Navigator.of(context).pushReplacementNamed('/home');
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        throw e; // Let the outer catch block handle FirebaseAuthExceptions
+      } else {
+        throw Exception('Failed to create account: $e');
+      }
+    }
   }
 
   void _showErrorMessage(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: errorColor,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
 
   void _showSuccessMessage(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: successColor,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -283,22 +382,17 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: backgroundColor,
       body: Stack(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [primaryColor, secondaryColor],
-              ),
-            ),
-            child: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: MediaQuery.of(context).size.width * 0.08,
-                      vertical: 24,
-                    ),
+          _buildBackground(),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.of(context).size.width * 0.08,
+                    vertical: 24,
+                  ),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
                     child: _buildLoginCard(),
                   ),
                 ),
@@ -319,23 +413,39 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            primaryColor.withOpacity(0.8),
+            secondaryColor,
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoginCard() {
     return Card(
       elevation: 8,
+      shadowColor: Colors.black26,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildHeader(),
-              SizedBox(height: 32),
+              const SizedBox(height: 40),
               _buildLoginForm(),
-              SizedBox(height: 24),
+              const SizedBox(height: 32),
               _buildActionButtons(),
             ],
           ),
@@ -347,27 +457,35 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Icon(
-          Icons.medical_services,
-          size: 64,
-          color: primaryColor,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Icon(
+            Icons.medical_services_rounded,
+            size: 54,
+            color: primaryColor,
+          ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
           'Health Hub',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.bold,
-            color: secondaryColor,
-            letterSpacing: 1.5,
+            color: textColor,
+            letterSpacing: 1.2,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           _isCreatingAccount ? 'Create Patient Account' : 'Welcome Back',
           style: TextStyle(
             fontSize: 16,
-            color: Colors.grey[600],
+            color: subtitleColor,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -376,10 +494,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLoginForm() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildFormLabel('Email Address'),
+        const SizedBox(height: 8),
         TextFormField(
           decoration: _getInputDecoration(
-            hint: 'Email',
+            hint: 'Enter your email',
             icon: Icons.email_rounded,
           ),
           keyboardType: TextInputType.emailAddress,
@@ -390,15 +511,18 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           onSaved: (value) => _email = value!,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 24),
+        _buildFormLabel('Password'),
+        const SizedBox(height: 8),
         TextFormField(
           decoration: _getInputDecoration(
-            hint: 'Password',
+            hint: 'Enter your password',
             icon: Icons.lock_rounded,
             suffixIcon: IconButton(
               icon: Icon(
                 _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                 color: primaryColor,
+                size: 22,
               ),
               onPressed: _togglePasswordVisibility,
             ),
@@ -406,13 +530,15 @@ class _LoginScreenState extends State<LoginScreen> {
           obscureText: !_isPasswordVisible,
           validator: (value) {
             if (value?.isEmpty ?? true) return 'Please enter your password';
-            if (value!.length < 6) return 'Password must be at least 6 characters';
+            if (_isCreatingAccount && value!.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
             return null;
           },
           onChanged: (value) => _password = value,
         ),
         if (!_isCreatingAccount) ...[
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -422,7 +548,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   color: primaryColor,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
             ),
           ),
@@ -432,12 +562,25 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildFormLabel(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: textColor,
+      ),
+    );
+  }
+
   List<Widget> _buildRegistrationFields() {
     return [
-      SizedBox(height: 16),
+      const SizedBox(height: 24),
+      _buildFormLabel('Confirm Password'),
+      const SizedBox(height: 8),
       TextFormField(
         decoration: _getInputDecoration(
-          hint: 'Confirm Password',
+          hint: 'Confirm your password',
           icon: Icons.lock_rounded,
         ),
         obscureText: !_isPasswordVisible,
@@ -447,10 +590,12 @@ class _LoginScreenState extends State<LoginScreen> {
         },
         onChanged: (value) => _confirmPassword = value,
       ),
-      SizedBox(height: 16),
+      const SizedBox(height: 24),
+      _buildFormLabel('Mobile Number'),
+      const SizedBox(height: 8),
       TextFormField(
         decoration: _getInputDecoration(
-          hint: 'Mobile Number',
+          hint: 'Enter your mobile number',
           icon: Icons.phone_rounded,
         ),
         keyboardType: TextInputType.phone,
@@ -471,29 +616,48 @@ class _LoginScreenState extends State<LoginScreen> {
           onPressed: _isLoading ? null : _handleLogin,
           child: Text(
             _isCreatingAccount ? 'Create Account' : 'Login',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryColor,
             foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(16),
             ),
-            minimumSize: Size(double.infinity, 50),
+            minimumSize: const Size(double.infinity, 54),
+            elevation: 0,
           ),
         ),
-        SizedBox(height: 16),
-        TextButton(
-          onPressed: _isLoading ? null : () {
-            setState(() => _isCreatingAccount = !_isCreatingAccount);
-          },
-          child: Text(
-            _isCreatingAccount
-                ? 'Already have an account? Login'
-                : 'Don\'t have an account? Sign up',
-            style: TextStyle(color: primaryColor),
-          ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _isCreatingAccount
+                  ? 'Already have an account?'
+                  : 'Don\'t have an account?',
+              style: TextStyle(color: subtitleColor),
+            ),
+            TextButton(
+              onPressed: _isLoading ? null : () {
+                setState(() => _isCreatingAccount = !_isCreatingAccount);
+              },
+              child: Text(
+                _isCreatingAccount ? 'Login' : 'Sign up',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+            ),
+          ],
         ),
       ],
     );

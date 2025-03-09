@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'providers/appointment_cart_provider.dart';
 import 'firebase_options.dart';
@@ -18,34 +17,12 @@ import 'doctor_dashboard.dart';
 import 'home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("Handling a background message: ${message.messageId}");
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-
-    // Configure Firebase Messaging
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-
-    // Request permission for iOS devices
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    String? token = await messaging.getToken();
-    print("FCM Token: $token");
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("Received a message in the foreground: ${message.notification?.title}");
-    });
 
     runApp(
       MultiProvider(
@@ -56,7 +33,7 @@ void main() async {
       ),
     );
   } catch (e) {
-    print('Error initializing Firebase or messaging: $e');
+    print('Error initializing Firebase: $e');
     runApp(
       MultiProvider(
         providers: [
@@ -82,7 +59,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(userId: '',),
         '/onboarding': (context) => const OnboardingScreen(),
-
         '/login': (context) => LoginScreen(),
         '/home': (context) {
           final auth = FirebaseAuth.instance;

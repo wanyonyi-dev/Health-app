@@ -47,7 +47,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
   late Animation<Offset> _slideAnimation;
 
   String selectedPeriod = 'Week';
-  String selectedMetric = 'Heart Rate'; // Changed from 'All' to 'Heart Rate'
+  String selectedMetric = 'Heart Rate';
   bool _isLoading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -168,6 +168,9 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
@@ -195,7 +198,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: _buildDashboardContent(),
+                  child: _buildDashboardContent(screenWidth, screenHeight),
                 ),
               ),
             );
@@ -210,21 +213,21 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     );
   }
 
-  Widget _buildDashboardContent() {
+  Widget _buildDashboardContent(double screenWidth, double screenHeight) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(screenWidth * 0.05),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDashboardHeader(),
+            _buildDashboardHeader(screenWidth),
             const SizedBox(height: 20),
-            _buildMetricsOverview(),
+            _buildMetricsOverview(screenWidth),
             const SizedBox(height: 24),
-            _buildTrendsChart(),
+            _buildTrendsChart(screenWidth),
             const SizedBox(height: 24),
-            _buildHealthGoals(),
+            _buildHealthGoals(screenWidth),
             const SizedBox(height: 20),
           ],
         ),
@@ -232,26 +235,26 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     );
   }
 
-  Widget _buildDashboardHeader() {
+  Widget _buildDashboardHeader(double screenWidth) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'Health Metrics',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: screenWidth * 0.06,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            color: const Color(0xFF1E293B),
           ),
         ),
-        _buildPeriodSelector(),
+        _buildPeriodSelector(screenWidth),
       ],
     );
   }
 
-  Widget _buildPeriodSelector() {
+  Widget _buildPeriodSelector(double screenWidth) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenWidth * 0.02),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -272,9 +275,9 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
               });
             }
           },
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontSize: 14,
+          style: TextStyle(
+            color: const Color(0xFF1E293B),
+            fontSize: screenWidth * 0.04,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -282,7 +285,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     );
   }
 
-  Widget _buildMetricsOverview() {
+  Widget _buildMetricsOverview(double screenWidth) {
     final metrics = [
       MetricCard(
         icon: LucideIcons.heart,
@@ -392,7 +395,10 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     return currentMetrics[metricType]?.trend ?? defaultValue;
   }
 
-  Widget _buildTrendsChart() {
+  Widget _buildTrendsChart(double screenWidth) {
+    // Get screen height from MediaQuery
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -400,7 +406,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         side: BorderSide(color: Colors.grey.shade200),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(screenWidth * 0.04),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -408,20 +414,20 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Health Trends',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: screenWidth * 0.05,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: const Color(0xFF1E293B),
                   ),
                 ),
-                _buildMetricSelector(),
+                _buildMetricSelector(screenWidth),
               ],
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 200,
+              height: screenHeight * 0.3,
               child: LineChart(
                 _createChartData(),
               ),
@@ -432,9 +438,9 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     );
   }
 
-  Widget _buildMetricSelector() {
+  Widget _buildMetricSelector(double screenWidth) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenWidth * 0.02),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -452,9 +458,9 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
               setState(() => selectedMetric = value);
             }
           },
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontSize: 14,
+          style: TextStyle(
+            color: const Color(0xFF1E293B),
+            fontSize: screenWidth * 0.04,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -603,7 +609,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     );
   }
 
-  Widget _buildHealthGoals() {
+  Widget _buildHealthGoals(double screenWidth) {
     final goals = [
       _buildGoalProgress(
         'Daily Steps',
@@ -638,17 +644,17 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
         side: BorderSide(color: Colors.grey.shade200),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(screenWidth * 0.04),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Health Goals',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: screenWidth * 0.05,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: const Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 16),
@@ -747,7 +753,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     switch (metric) {
       case 'Heart Rate': return LucideIcons.heart;
       case 'Steps': return LucideIcons.footprints;
-      // ... add other cases
+    // ... add other cases
       default: return LucideIcons.activity;
     }
   }
@@ -760,7 +766,7 @@ class _HealthMetricsDashboardState extends State<HealthMetricsDashboard>
     switch (metric) {
       case 'Heart Rate': return 'bpm';
       case 'Steps': return 'steps';
-      // ... add other cases
+    // ... add other cases
       default: return '';
     }
   }
@@ -773,8 +779,8 @@ class MetricCard extends StatelessWidget {
   final String unit;
   final String trend;
   final Color color;
-  final String metricType; // Add this
-  final String userId; // Add this
+  final String metricType;
+  final String userId;
 
   const MetricCard({
     super.key,
@@ -784,103 +790,123 @@ class MetricCard extends StatelessWidget {
     required this.unit,
     required this.trend,
     required this.color,
-    required this.metricType, // Add this
-    required this.userId, // Add this
+    required this.metricType,
+    required this.userId,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _showAddMetricDialog(context),
-      borderRadius: BorderRadius.circular(16),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = constraints.maxWidth < 200;
+        final iconSize = isSmallScreen ? 16.0 : 20.0;
+        final fontSize = isSmallScreen ? 12.0 : 14.0;
+        final padding = constraints.maxWidth * 0.06; // Reduced padding
+
+        return InkWell(
+          onTap: () => _showAddMetricDialog(context),
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: color, size: 20),
-                  ),
-                  const Spacer(),
-                  if (trend != '0')
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: trend.startsWith('+')
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        trend,
-                        style: TextStyle(
-                          color: trend.startsWith('+')
-                              ? Colors.green[700]
-                              : Colors.red[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(padding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(padding * 0.4),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: color, size: iconSize),
+                        ),
+                        if (trend != '0')
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: padding * 0.4,
+                              vertical: padding * 0.2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: trend.startsWith('+')
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              trend,
+                              style: TextStyle(
+                                color: trend.startsWith('+')
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                                fontSize: fontSize - 2,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    unit,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: padding * 0.2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                value,
+                                style: TextStyle(
+                                  fontSize: fontSize * 1.4,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              SizedBox(width: padding * 0.2),
+                              Text(
+                                unit,
+                                style: TextStyle(
+                                  fontSize: fontSize - 2,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

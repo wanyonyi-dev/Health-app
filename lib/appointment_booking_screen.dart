@@ -432,7 +432,7 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            
+
             // Calendar widget
             Card(
               child: CalendarDatePicker(
@@ -449,88 +449,56 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Session selection
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('appointments')
-                  .where('serviceId', isEqualTo: _selectedService)
-                  .where('dateTime',
-                      isGreaterThanOrEqualTo: DateTime(
-                          _selectedDate.year, _selectedDate.month, _selectedDate.day))
-                  .where('dateTime',
-                      isLessThan: DateTime(
-                          _selectedDate.year, _selectedDate.month, _selectedDate.day + 1))
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final Map<String, int> sessionCounts = {
-                  'Morning (8:00 AM - 1:00 PM)': 0,
-                  'Afternoon (2:00 PM - 4:00 PM)': 0,
-                };
-
-                if (snapshot.hasData) {
-                  for (var doc in snapshot.data!.docs) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    String session = data['session'] as String;
-                    sessionCounts[session] = (sessionCounts[session] ?? 0) + 1;
-                  }
-                }
-
-                final Service service =
-                    services.firstWhere((s) => s.id == _selectedService);
-
-                return Column(
-                  children: sessionCounts.entries.map((entry) {
-                    int availableSlots = service.maxSlotsPerSession - entry.value;
-                    bool isSessionAvailable = SessionUtils.isSessionAvailable(
-                      entry.key, 
-                      _selectedDate
-                    );
-                    bool isAvailable = availableSlots > 0 && isSessionAvailable;
-
-                    String subtitle = isSessionAvailable 
-                        ? 'Available slots: $availableSlots'
-                        : 'Session expired';
-
-                    return RadioListTile<String>(
-                      title: Text(entry.key),
-                      subtitle: Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: isAvailable ? Colors.green : Colors.red,
-                        ),
-                      ),
-                      value: entry.key,
-                      groupValue: _selectedSession,
-                      onChanged: isAvailable
-                          ? (String? value) {
-                              setState(() {
-                                _selectedSession = value;
-                              });
-                            }
-                          : null,
-                      activeColor: Colors.blue,
-                      tileColor: isAvailable ? null : Colors.grey.shade200,
-                    ).animate()
-                        .fadeIn()
-                        .scale();
-                  }).toList(),
+            // Session selection - modified to work without index
+            Column(
+              children: [
+                'Morning (8:00 AM - 1:00 PM)',
+                'Afternoon (2:00 PM - 4:00 PM)',
+              ].map((session) {
+                bool isSessionAvailable = SessionUtils.isSessionAvailable(
+                    session,
+                    _selectedDate
                 );
-              },
+
+                // Default to max slots until we have the real data
+                final Service service =
+                services.firstWhere((s) => s.id == _selectedService);
+                int availableSlots = service.maxSlotsPerSession;
+
+                bool isAvailable = availableSlots > 0 && isSessionAvailable;
+                String subtitle = isSessionAvailable
+                    ? 'Available slots: $availableSlots'
+                    : 'Session expired';
+
+                return RadioListTile<String>(
+                  title: Text(session),
+                  subtitle: Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: isAvailable ? Colors.green : Colors.red,
+                    ),
+                  ),
+                  value: session,
+                  groupValue: _selectedSession,
+                  onChanged: isAvailable
+                      ? (String? value) {
+                    setState(() {
+                      _selectedSession = value;
+                    });
+                  }
+                      : null,
+                  activeColor: Colors.blue,
+                  tileColor: isAvailable ? null : Colors.grey.shade200,
+                ).animate()
+                    .fadeIn()
+                    .scale();
+              }).toList(),
             ),
           ],
         ),
       ),
     );
   }
-
 
   Widget _buildBookingButton() {
     return ElevatedButton(

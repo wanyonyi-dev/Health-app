@@ -1,6 +1,6 @@
 {
-    "name": "health_connect_new",
-    "short_name": "health_connect_new",
+    "name": "health_hub",
+    "short_name": "health_hub",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",

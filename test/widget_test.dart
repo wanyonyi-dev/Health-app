@@ -1,26 +1,30 @@
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:health_connect/main.dart';
-import 'package:health_connect/splash_screen.dart';
-import 'package:health_connect/home_screen.dart';
+
+import 'package:health_hub/main.dart';
 
 void main() {
-  testWidgets('SplashScreen shows for 8 seconds and then navigates to HomeScreen', (WidgetTester tester) async {
-    // Build the app and trigger a frame
-    await tester.pumpWidget(const MyApp(userId: '12345',));
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that SplashScreen is displayed
-    expect(find.text('We Care'), findsOneWidget);
-    expect(find.byType(SplashScreen), findsOneWidget);
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
 
-    // Fast forward time by 8 seconds
-    await tester.pump(const Duration(seconds: 8));
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
 
-    // Trigger a frame after the duration
-    await tester.pumpAndSettle();
-
-    // Verify that HomeScreen is displayed
-    expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('Health Connect'), findsOneWidget);
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }

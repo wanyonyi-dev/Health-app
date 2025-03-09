@@ -1,4 +1,4 @@
-# health_connect_new
+# health_hub
 
 A new Flutter project.
 
